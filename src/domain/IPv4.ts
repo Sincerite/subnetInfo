@@ -1,55 +1,79 @@
+
 export default class IPv4 {
-    constructor(value: number) {
-        this._value = value;
-    }
+
 
     private static _defaultMaskSize: number = 24;
 
-    private _octets:Array<number> = [0, 0, 0, 0];
+    _octets:Array<number> = [0, 0, 0, 0];
 
-    private _value: number;
+    _value: number;
 
     public mask: IPv4;
-    private _maskSize:number;
-    public addressClass: IPv4;
+    _maskSize:number;
+    public addressClass: string;
     public subnet: IPv4;
+    public wildcardMask: IPv4;
     public broadcast: IPv4;
     public firstHostAddress: IPv4;
     public lastHostAddress: IPv4;
 
 
-    // ToDo: Move to store
-
-
     public maxHostAmmount: number;
     public belongsToPublicPool: boolean;
 
-    private _initiateProperties() {
-        this.mask = new IPv4(this.calculateMaskNumber(this._maskSize));
-        this.addressClass = this._calculateClassType();
-        this.subnet = IPv4.calculateSubnetAddress(_value, mask);
+    constructor(octets: Array<number>) {
+        this._octets = octets;
     }
 
-    public static parse(address: string): IPv4 {
-        let ip:IPv4 = new IPv4();
+    _initiateProperties() {
+        this._value = IPv4.addressValueFromOctets(this._octets);
+        this.mask = new IPv4(this.calculateMaskValue(this._maskSize));
+        this.addressClass = this._calculateClassType();
+        this.subnet = this.calculateSubnetAddress(this._octets, this.mask);
+        this.wildcardMask = this.calculateWildcardMask(this.mask);
+        this.broadcast = this.calculateBroadcastAddress(this._octets, this.wildcardMask);
+        this.firstHostAddress = this.calculateFirstHostAddress(this.subnet);
+        this.lastHostAddress = this.calculateLastHostAddress(this.broadcast);
+    }
 
+    static convertNumberToUInt32(number: number): number {
+        return number >>> 0;
+    }
+
+    public parse(address: string): IPv4 {
         if (address.includes("/")) {
             const split:Array<string> = address.split("/");
             address = split[0];
-            ip._maskSize = parseInt(split[1]);
+            this._maskSize = parseInt(split[1]);
         } else {
-            ip._maskSize = IPv4._defaultMaskSize;
+            this._maskSize = IPv4._defaultMaskSize;
         }
 
         let octets = address.split(".");
         let i = 0;
-        for (let octet in octets) {
-            ip._octets[i++] = parseInt(octet);
+        for (let octet of octets) {
+            this._octets[i++] = parseInt(octet);
         }
-        return ip;
+
+        this._initiateProperties();
+        return this;
     }
 
-    private _calculateClassType() {
+    static printAsBinString(number: number) {
+        var sign = (number < 0 ? "-" : "");
+        var result = Math.abs(number).toString(2);
+        while(result.length < 32) {
+            result = "0" + result;
+        }
+        return sign + result;
+    }
+
+    static printBinStringAsNumber(string: string) {
+        return parseInt(string, 2);
+
+    }
+
+    _calculateClassType() {
         const firstOctet: number = this._octets[0];
         if (firstOctet < 128) return "A";
         if (firstOctet < 192) return "B";
@@ -65,45 +89,74 @@ export default class IPv4 {
         return true;
     }
 
-
+    // JavaScript Int32 issue
     public static octetsFromAddressValue(value: number) {
-        let octets: Array<number> = new Array<number>(4);
-        for (let i = 0; i < 4; i++) {
-            octets[i] = value >> ((3 - i) * 8);
-        }
+        const base = "00000000000000000000000000000000"; // 32
+        let polyfill = value.toString(2);
+        polyfill = base.substring(0, 32 - polyfill.length) + polyfill;
+
+        const octets = [parseInt(polyfill.substring(0, 8), 2),
+            (value & 16711680) / 65536,
+            (value & 65280) / 256,
+            (value & 255)];
+
         return octets;
     }
 
+    // JavaScript Int32 issue
     public static addressValueFromOctets(octets: Array<number>) {
         let value: number = 0;
-        for (let i = 0; i < 4; i++) {
-            let oct = octets[i] << ((3 - i) * 8);
-            value += oct;
-        }
+        value += octets[0] * 16777216;
+        value += octets[1] * 65536;
+        value += octets[2] * 256;
+        value += octets[3];
         return value;
     }
 
-    public static calculateMaskNumber(maskSize: number) {
-        return 192 << 32 - maskSize;
+    public calculateMaskValue(maskSize: number): any {
+        const base = "11111111111111111111111111111111"; // 32
+        let mask = parseInt(base.substring(0, maskSize), 2); // base >> maskSize
+        mask *= Math.pow(2, 32 - maskSize); // JavaScript style
+        return IPv4.octetsFromAddressValue(mask);
     }
 
-    public static calculateSubnetAddress(address, mask) {
-        return mask & address;
+    public calculateSubnetAddress(address: Array<number>, mask: IPv4): IPv4 {
+        let subnet = new IPv4([0, 0, 0, 0]);
+        for (let i = 0; i < 4; i++) {
+            subnet._octets[i] = address[i] & mask._octets[i];
+        }
+        return subnet;
     }
 
-    public static calculateFirstHostAddress(subnetAddress) {
-        return subnetAddress + 1;
+    public calculateWildcardMask(mask: IPv4): IPv4 {
+        let wildcard = new IPv4([0, 0, 0, 0]);
+        for (let i = 0; i < 4; i++) {
+            wildcard._octets[i] = 255 - mask._octets[i];
+        }
+        return wildcard;
     }
 
-    public static calculateBroadcastAddress(address, mask) {
-        return ~mask | address;
+    public calculateBroadcastAddress(address: Array<number>, wildcardMask: IPv4): IPv4 {
+        let broadcast = new IPv4([0, 0, 0, 0]);
+        for (let i = 0; i < 4; i++) {
+            broadcast._octets[i] = address[i] | wildcardMask._octets[i];
+        }
+        return broadcast;
     }
 
-    public static calculateLastHostAddress(broadcastAddress) {
-        return broadcastAddress - 1;
+    public calculateFirstHostAddress(subnet: IPv4): IPv4 {
+        const subnetVal = IPv4.addressValueFromOctets(subnet._octets);
+        const firstHost = IPv4.octetsFromAddressValue(subnetVal + 1);
+        return new IPv4(firstHost);
     }
 
-    public static calculateMaxHostAmmount(mask) {
+    public calculateLastHostAddress(broadcast:IPv4): IPv4 {
+        const broadcastVal = IPv4.addressValueFromOctets(broadcast._octets);
+        const lastHost = IPv4.octetsFromAddressValue(broadcastVal - 1);
+        return new IPv4(lastHost);
+    }
+
+    public calculateMaxHostAmmount(mask): any {
         let am = (~mask) - 1;
         return am >= 0 ? am : 0;
     }
