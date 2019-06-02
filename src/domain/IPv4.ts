@@ -70,7 +70,10 @@ export default class IPv4 {
 
     static printBinStringAsNumber(string: string) {
         return parseInt(string, 2);
+    }
 
+    public printOctets() {
+        return this._octets[0] + "." + this._octets[1] + "." + this._octets[2] + "." + this._octets[3];
     }
 
     _calculateClassType() {
@@ -82,7 +85,7 @@ export default class IPv4 {
         return "E";
     }
 
-    private _determineIsInPublicPool() {
+    public determineIsInPublicPool() {
         if (this._octets[0] == 10) return false;
         if (this._octets[0] == 172 && this._octets[1] >= 16 && this._octets[1] <= 31) return false;
         if (this._octets[0] == 192 && this._octets[1] == 168) return false;
