@@ -17,9 +17,9 @@ export default class IPv4 {
     public firstHostAddress: IPv4;
     public lastHostAddress: IPv4;
 
-
     public maxHostAmmount: number;
     public belongsToPublicPool: boolean;
+    public isHost: boolean;
 
     constructor(octets: Array<number>) {
         this._octets = octets;
@@ -34,6 +34,8 @@ export default class IPv4 {
         this.broadcast = this.calculateBroadcastAddress(this._octets, this.wildcardMask);
         this.firstHostAddress = this.calculateFirstHostAddress(this.subnet);
         this.lastHostAddress = this.calculateLastHostAddress(this.broadcast);
+        this.maxHostAmmount = this.calculateMaxHostAmmount();
+        this.isHost = this.determineIsHost();
     }
 
     static convertNumberToUInt32(number: number): number {
@@ -85,6 +87,10 @@ export default class IPv4 {
         return "E";
     }
 
+    public determineIsHost() {
+        return this.toAddressValue() != this.broadcast.toAddressValue() && this.toAddressValue() != this.subnet.toAddressValue();
+    }
+
     public determineIsInPublicPool() {
         if (this._octets[0] == 10) return false;
         if (this._octets[0] == 172 && this._octets[1] >= 16 && this._octets[1] <= 31) return false;
@@ -104,6 +110,10 @@ export default class IPv4 {
             (value & 255)];
 
         return octets;
+    }
+
+    public toAddressValue() {
+        return IPv4.addressValueFromOctets(this._octets);
     }
 
     // JavaScript Int32 issue
@@ -159,9 +169,9 @@ export default class IPv4 {
         return new IPv4(lastHost);
     }
 
-    public calculateMaxHostAmmount(mask): any {
-        let am = (~mask) - 1;
-        return am >= 0 ? am : 0;
+    public calculateMaxHostAmmount(): any {
+        const bits = 32 - this._maskSize;
+        return Math.pow(2, bits) - 2;
     }
 
 }

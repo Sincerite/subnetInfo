@@ -7,12 +7,6 @@ export class UiStore {
     @observable
     public currentIPAddress: IPv4;
 
-
-
-
-
-
-
     public initiateNewAddress(address: string): IPv4 {
         this.currentIPAddress = new IPv4([0, 0, 0, 0]);
         this.currentIPAddress = this.currentIPAddress.parse(address);
@@ -28,7 +22,8 @@ export class UiStore {
         console.log("Broadcast", this.currentIPAddress.broadcast);
         console.log("First Host Address", this.currentIPAddress.firstHostAddress);
         console.log("Last Host Address", this.currentIPAddress.lastHostAddress);
-
+        console.log("Max Host Ammount", this.currentIPAddress.maxHostAmmount);
+        console.log("IsHost?", this.currentIPAddress.isHost);
 
         return this.currentIPAddress;
     }
