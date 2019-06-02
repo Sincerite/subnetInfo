@@ -22,6 +22,8 @@ export default class App extends React.Component<any, any> {
         this.state = {
             ipv4Value: "127.0.0.1",
             pingTime: 0,
+            pingEnabled: false,
+            downloadEnabled: false,
         };
     }
 
@@ -44,12 +46,36 @@ export default class App extends React.Component<any, any> {
         this.ping(this.state.ipv4Value, 80, console.log);
     };
 
+    _handleDownloadButton = (e) => {
+        e.preventDefault();
+        const { uiStore } = this.props;
+
+        let data = "Octets: " + uiStore.currentIPAddress._octets + "/n";
+        data += "Value: " + uiStore.currentIPAddress._value;
+        data += "Mask: " + uiStore.currentIPAddress.mask.printOctets();
+        data += "Mask Size: " + uiStore.currentIPAddress._maskSize;
+        data += "Address Class: " + uiStore.currentIPAddress.addressClass;
+        data += "Subnet: " + uiStore.currentIPAddress.subnet.printOctets();
+        data += "Wildcard Mask: " + uiStore.currentIPAddress.wildcardMask.printOctets();
+        data += "Broadcast: " + uiStore.currentIPAddress.broadcast.printOctets();
+        data += "First Host Address: " + uiStore.currentIPAddress.firstHostAddress.printOctets();
+        data += "Last Host Address: " + uiStore.currentIPAddress.lastHostAddress.printOctets();
+        data += "Max Host Ammount: " + uiStore.currentIPAddress.maxHostAmmount;
+        data += "IsHost: " + uiStore.currentIPAddress.isHost;
+
+        this.download(data, "NetworkInfo", "txt");
+    };
+
     _handleSubmit = (e) => {
         e.preventDefault();
         const { uiStore } = this.props;
 
         if (/^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(this.state.ipv4Value)) {
             uiStore.initiateNewAddress(this.state.ipv4Value);
+            this.setState({
+               pingEnabled: true,
+               downloadEnabled: true,
+            });
         } else {
             console.error("Invalid IP Address..")
         }
@@ -101,6 +127,25 @@ export default class App extends React.Component<any, any> {
     //
     // }
 
+    // Function to download data to a file
+    public download(data, filename, type) {
+        var file = new Blob([data], {type: type});
+        if (window.navigator.msSaveOrOpenBlob) // IE10+
+            window.navigator.msSaveOrOpenBlob(file, filename);
+        else { // Others
+            var a = document.createElement("a"),
+                url = URL.createObjectURL(file);
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(function() {
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            }, 0);
+        }
+    }
+
 
     render() {
         const { uiStore } = this.props;
@@ -114,13 +159,23 @@ export default class App extends React.Component<any, any> {
                                value={this.state.ipv4Value}
                                onChange={this._handleIpv4change}
                         />
-                        <button onClick={ this._handlePingButton }
-                                className="btn btn-secondary"
-                                formNoValidate>Ping
-                        </button>
+
                         <button type="submit"
                                 className="btn btn-primary"
-                                formNoValidate>Submit
+                                formNoValidate>
+                            Submit
+                        </button>
+                        <button onClick={ this._handlePingButton }
+                                className="btn btn-secondary"
+                                formNoValidate
+                                disabled={!this.state.pingEnabled}>
+                            Ping
+                        </button>
+                        <button onClick={ this._handleDownloadButton }
+                                className="btn btn-secondary"
+                                formNoValidate
+                                disabled={!this.state.downloadEnabled}>
+                            Download
                         </button>
                     </form>
                 </div>
